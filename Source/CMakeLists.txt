@@ -12,3 +12,5 @@ target_sources(MetalRenderer
 )
 
 set_source_files_properties(Shaders.metal PROPERTIES LANGUAGE METAL)
+
+add_subdirectory(Math)

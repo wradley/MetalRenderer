@@ -11,10 +11,14 @@ struct VertexOut
 };
 
 
-vertex VertexOut VertexFunction(const device Vertex *vin [[buffer(0)]], uint vid [[vertex_id]])
+vertex VertexOut VertexFunction(
+                                const device Vertex *vin [[buffer(0)]],
+                                const constant Uniform *uform [[buffer(1)]],
+                                uint vid [[vertex_id]])
 {
     VertexOut vout;
-    vout.position = float4(vin[vid].position.xy, 0.0f, 1.0f);
+    vout.position = uform->modelViewProj * float4(vin[vid].position.xyz, 1.0f);
+    //vout.position = float4(vin[vid].position.xyz, 1.0f);
     vout.color = vin[vid].color;
     return vout;
 }
