@@ -1,0 +1,10 @@
+target_sources(MetalRenderer
+    PRIVATE
+        AppDelegate.h
+        AppDelegate.m
+        main.m
+        ViewController.h
+        ViewController.m
+        ViewDelegate.h
+        ViewDelegate.m
+)
