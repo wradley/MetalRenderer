@@ -1,5 +1,7 @@
 target_sources(MetalRenderer
-    PUBLIC
-        MatrixOperations.h
-        MatrixOperations.m
+    PRIVATE
+        MatrixOperations.cpp
+        MatrixOperations.hpp
+        Transform.cpp
+        Transform.hpp
 )

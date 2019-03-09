@@ -14,8 +14,11 @@
 
     // Do any additional setup after loading the view.
     MTKView *view = (MTKView*) self.view;
+    view.depthStencilPixelFormat = MTLPixelFormatDepth32Float;
     mViewDelegate = [[ViewDelegate alloc] initWithMtkView:view];
     view.delegate = mViewDelegate;
+    
+    [mViewDelegate mtkView:view drawableSizeWillChange:view.drawableSize];
 }
 
 

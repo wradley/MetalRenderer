@@ -8,9 +8,11 @@ target_sources(MetalRenderer
         ViewController.h
         ViewController.m
         ViewDelegate.h
-        ViewDelegate.m
+        ViewDelegate.mm
 )
 
 set_source_files_properties(Shaders.metal PROPERTIES LANGUAGE METAL)
 
 add_subdirectory(Math)
+add_subdirectory(Mesh)
+add_subdirectory(Util)
