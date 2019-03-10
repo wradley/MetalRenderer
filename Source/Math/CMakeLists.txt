@@ -1,7 +1,11 @@
 target_sources(MetalRenderer
     PRIVATE
+        Math.hpp
+        MathDefines.h
         MatrixOperations.cpp
         MatrixOperations.hpp
+        QuaternionOperations.hpp
+        QuaternionOperations.cpp
         Transform.cpp
         Transform.hpp
 )

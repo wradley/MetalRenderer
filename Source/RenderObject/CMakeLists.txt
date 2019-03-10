@@ -1,0 +1,11 @@
+target_sources(MetalRenderer
+    PRIVATE
+        Camera.cpp
+        Camera.hpp
+        Model.cpp
+        Model.hpp
+        RenderGroup.cpp
+        RenderGroup.hpp
+        RenderObject.cpp
+        RenderObject.hpp
+)

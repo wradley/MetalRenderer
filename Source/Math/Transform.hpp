@@ -7,6 +7,8 @@ class Transform
 public:
     
     Transform();
+    Transform(const Transform &t);
+    Transform operator= (const Transform &t);
     ~Transform();
     
     simd_float4x4 getMatrix() const;

@@ -1,4 +1,5 @@
 //  Copyright © 2019 Whelan Callahan. All rights reserved.
+#pragma once
 #include <objc/objc-runtime.h>
 #include "../Math/Transform.hpp"
 

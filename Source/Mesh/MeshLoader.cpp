@@ -111,6 +111,49 @@ simd_float3 GetNormal(FbxMesh *mesh, int controlPoint, int vertex)
 }
 
 
+simd_float2 GetUV(FbxMesh *mesh, int controlPoint, int vertex)
+{
+    simd_float2 uv = simd_make_float2(0.0f, 0.0f);
+    FbxGeometryElementUV *elementUV = mesh->GetElementUV(0);
+    if (elementUV) {
+        switch (elementUV->GetMappingMode()) {
+            case FbxGeometryElement::eByControlPoint:
+                switch (elementUV->GetReferenceMode()) {
+                    case FbxGeometryElement::eDirect:
+                        uv[0] = elementUV->GetDirectArray().GetAt(controlPoint)[0];
+                        uv[1] = elementUV->GetDirectArray().GetAt(controlPoint)[1];
+                    case FbxGeometryElement::eIndexToDirect: {
+                        int index = elementUV->GetIndexArray().GetAt(controlPoint);
+                        uv[0] = elementUV->GetDirectArray().GetAt(index)[0];
+                        uv[1] = elementUV->GetDirectArray().GetAt(index)[1];
+                    }   break;
+                    default:
+                        break;
+                }
+                break;
+            case FbxGeometryElement::eByPolygonVertex:
+                switch (elementUV->GetReferenceMode()) {
+                    case FbxGeometryElement::eDirect:
+                        uv[0] = elementUV->GetDirectArray().GetAt(vertex)[0];
+                        uv[1] = elementUV->GetDirectArray().GetAt(vertex)[1];
+                    case FbxGeometryElement::eIndexToDirect: {
+                        int index = elementUV->GetIndexArray().GetAt(vertex);
+                        uv[0] = elementUV->GetDirectArray().GetAt(index)[0];
+                        uv[1] = elementUV->GetDirectArray().GetAt(index)[1];
+                    }   break;
+                    default:
+                        break;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+    
+    return uv;
+}
+
+
 std::shared_ptr<CPUMesh> ProccessMesh(FbxMesh *mesh)
 {
     auto meshData = std::make_shared<CPUMesh>();
@@ -132,6 +175,7 @@ std::shared_ptr<CPUMesh> ProccessMesh(FbxMesh *mesh)
             Vertex v;
             v.position = simd_make_float3(ctrlPts[index][0], ctrlPts[index][1], ctrlPts[index][2]);
             v.normal = GetNormal(mesh, index, counter);
+            v.uv = GetUV(mesh, index, counter);
             meshData->vertices.push_back(v);
             
             ++counter;

@@ -19,7 +19,7 @@ target_link_libraries(MetalRenderer
     optimized ${fbx_sdk_release_lib}
 )
 
-target_include_directories(MetalRenderer
+target_include_directories(MetalRenderer SYSTEM
     PRIVATE
         ${fbx_sdk_includes}
 )

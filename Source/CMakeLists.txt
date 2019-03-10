@@ -3,6 +3,8 @@ target_sources(MetalRenderer
         AppDelegate.h
         AppDelegate.m
         main.m
+        Renderer.hpp
+        Renderer.mm
         Shaders.metal
         ShaderTypes.h
         ViewController.h
@@ -15,4 +17,5 @@ set_source_files_properties(Shaders.metal PROPERTIES LANGUAGE METAL)
 
 add_subdirectory(Math)
 add_subdirectory(Mesh)
-add_subdirectory(Util)
+add_subdirectory(RenderObject)
+add_subdirectory(Texture)
