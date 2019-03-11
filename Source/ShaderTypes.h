@@ -7,6 +7,8 @@ typedef struct {
     vector_float3 position;
     vector_float3 normal;
     vector_float2 uv;
+    //vector_int3   bones;
+    //vector_float3 boneWeights;
 } Vertex;
 
 

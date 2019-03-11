@@ -7,7 +7,7 @@
 Transform::Transform()
 {
     position = simd_make_float3(0.0f, 0.0f, 0.0f);
-    rotation = Quat::FromAxisAngle(simd_make_float3(0.0f, 0.0f, -1.0f), 0.0f);
+    rotation = Quat::FromAxisAngle(simd_make_float3(0.0f, 1.0f, 0.0f), 0.0f);
     scale = simd_make_float3(1.0f, 1.0f, 1.0f);
 }
 

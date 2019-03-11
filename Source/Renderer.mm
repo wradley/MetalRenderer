@@ -132,6 +132,8 @@ void Renderer::draw(id View)
     renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(63.0/255, 133.0/255, 193.0/255, 1.0);
     id<MTLRenderCommandEncoder> encoder = [cmdBuff renderCommandEncoderWithDescriptor:renderPassDescriptor];
     
+    [encoder setFrontFacingWinding:MTLWindingClockwise];
+    [encoder setCullMode:MTLCullModeBack];
     [encoder setDepthStencilState:mData->depthStencilState];
     [encoder setRenderPipelineState:mData->renderPipeline];
     

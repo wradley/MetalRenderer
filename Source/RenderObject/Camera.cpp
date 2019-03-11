@@ -72,7 +72,7 @@ simd_float4x4 Camera::getGlobalViewMatrix() const
 {
     simd_float4x4 mat = getGlobalTransformMatrix();
     simd_float4 myPos = simd_mul(mat, simd_make_float4(0.0f, 0.0f, 0.0f, 1.0f));
-    simd_float4 target = simd_mul(mat, simd_make_float4(0.0f, 0.0f, -1.0f, 1.0f));
+    simd_float4 target = simd_mul(mat, simd_make_float4(0.0f, 0.0f, 1.0f, 1.0f));
     
     return Matrix::LookAtRH(simd_make_float3(myPos), simd_make_float3(target), simd_make_float3(0.0f, 1.0f, 0.0f));
 }
