@@ -7,21 +7,29 @@ find_library(cocoa_lib Cocoa)
 find_library(metal_lib Metal)
 find_library(metal_kit_lib MetalKit)
 
-set(fbx_sdk_includes "" CACHE FILEPATH "FBX SDK include directory")
-set(fbx_sdk_debug_lib "" CACHE FILEPATH "FBX SDK static debug library")
-set(fbx_sdk_release_lib "" CACHE FILEPATH "FBX SDK static release library")
+set(assimp_includes "" CACHE FILEPATH "Assimp include directory")
+set(assimp_debug_lib "" CACHE FILEPATH "Assimp static debug library")
+set(IrrXML_debug_lib "" CACHE FILEPATH "IrrXML static debug library")
+set(LibZ_debug_lib "" CACHE FILEPATH "LibZ static debug library")
+set(assimp_release_lib "" CACHE FILEPATH "Assimp static release library")
+set(IrrXML_release_lib "" CACHE FILEPATH "IrrXML static release library")
+set(LibZ_release_lib "" CACHE FILEPATH "LibZ static release library")
 
 target_link_libraries(MetalRenderer
     general ${cocoa_lib}
     general ${metal_lib}
     general ${metal_kit_lib}
-    debug ${fbx_sdk_debug_lib}
-    optimized ${fbx_sdk_release_lib}
+    debug ${assimp_debug_lib}
+    debug ${IrrXML_debug_lib}
+    debug ${LibZ_debug_lib}
+    optimized ${assimp_release_lib}
+    optimized ${IrrXML_release_lib}
+    optimized ${LibZ_release_lib}
 )
 
 target_include_directories(MetalRenderer SYSTEM
     PRIVATE
-        ${fbx_sdk_includes}
+        ${assimp_includes}
 )
 
 set_target_properties(MetalRenderer

@@ -32,7 +32,7 @@ RendererResourceDelegate::~RendererResourceDelegate()
 {}
 
 
-std::vector<Mesh> RendererResourceDelegate::createMeshes(std::vector<std::shared_ptr<MeshData>> datas)
+std::vector<Mesh> RendererResourceDelegate::createMeshes(std::shared_ptr<std::vector<MeshData>> datas)
 {
     id<MTLDevice> device = mDevice;
     id<MTLCommandQueue> cmdQ = mCmdQ;
@@ -41,17 +41,17 @@ std::vector<Mesh> RendererResourceDelegate::createMeshes(std::vector<std::shared
     std::vector<id<MTLBuffer>> uploads;
     std::vector<Mesh> meshes;
     
-    for (std::shared_ptr<MeshData> data : datas) {
+    for (MeshData &data : *datas) {
         Mesh mesh;
-        unsigned int vertsSize = sizeof(Vertex) * data->vertices.size();
-        unsigned int indicesSize = sizeof(Index) * data->indices.size();
+        unsigned int vertsSize = sizeof(Vertex) * data.vertices.size();
+        unsigned int indicesSize = sizeof(Index) * data.indices.size();
         unsigned int totalSize = vertsSize + indicesSize;
         
         id<MTLBuffer> upload = [device newBufferWithLength:totalSize
                                                    options:MTLResourceStorageModeShared];
         void *indexContentsStart = (char*)upload.contents + vertsSize;
-        memcpy(upload.contents, &data->vertices[0], vertsSize);
-        memcpy(indexContentsStart, &data->indices[0], indicesSize);
+        memcpy(upload.contents, &data.vertices[0], vertsSize);
+        memcpy(indexContentsStart, &data.indices[0], indicesSize);
         
         id<MTLBuffer> viBuffer = [device newBufferWithLength:totalSize
                                                      options:MTLResourceStorageModePrivate];
@@ -63,11 +63,11 @@ std::vector<Mesh> RendererResourceDelegate::createMeshes(std::vector<std::shared
                            size:totalSize];
         
         mesh.vertexIndexBuffer = mVertexIndexBuffers.size();
-        mesh.indexCount = data->indices.size();
+        mesh.indexCount = data.indices.size();
         mesh.indexOffset = vertsSize;
         assignUniform(mesh.uniformBuffer, mesh.uniformBufferOffset);
-        if (data->skeleton.boneCount)
-            assignBoneMatrices(data->skeleton.boneCount, mesh.boneBuffer, mesh.boneBufferOffset);
+        if (data.skeleton.boneCount)
+            assignBoneMatrices(data.skeleton.boneCount, mesh.boneBuffer, mesh.boneBufferOffset);
         uploads.push_back(upload);
         meshes.push_back(mesh);
         mVertexIndexBuffers.push_back(viBuffer);

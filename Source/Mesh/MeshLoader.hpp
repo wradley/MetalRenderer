@@ -7,6 +7,6 @@ class MeshLoader
 {
 public:
 
-    static std::vector<std::shared_ptr<MeshData>> LoadFromFile(const char *filepath);
+    static std::shared_ptr<std::vector<MeshData>> LoadFromFile(const char *filepath);
 
 };

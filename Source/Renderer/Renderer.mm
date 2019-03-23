@@ -223,6 +223,9 @@ void Renderer::updateAnimations(uint64 time)
         if (!model.skeleton.boneCount)
             continue;
         
+        if (model.currAnimation >= model.animationCount)
+            continue;
+        
         id<MTLBuffer> boneMats = mBoneBuffers[model.mesh.boneBuffer];
         void *boneMatsDst = (char*)boneMats.contents + model.mesh.boneBufferOffset;
         model.calculateBoneMatrices(boneMatsDst, time);

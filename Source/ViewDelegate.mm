@@ -104,22 +104,29 @@ Animation CreateAnimation()
         mCamera = mRenderer->objectDelegate->createGroup(rootGroup);
         mCameraAttachment = mRenderer->objectDelegate->createCamera(mCamera);
         Transform t;
-        t.position[2] = 5;
+        t.position[1] = 3;
+        t.position[2] = 8;
         t.rotation = Quat::FromAxisAngle(simd_make_float3(0, 1, 0), DEG_TO_RAD(180));
         mRenderer->objectDelegate->setGroupTransform(mCamera, t);
         mRenderer->setCamera(mCameraAttachment);
         
         mModel = mRenderer->objectDelegate->createGroup(rootGroup);
         mModelAttatchment = mRenderer->objectDelegate->createModel(mModel);
-        std::shared_ptr<MeshData> cube = CreatePlane();
-        std::vector<std::shared_ptr<MeshData>> meshDatas;
-        meshDatas.push_back(cube);
+//        std::shared_ptr<MeshData> cube = CreatePlane();
+//        std::vector<std::shared_ptr<MeshData>> meshDatas;
+//        meshDatas.push_back(cube);
+//        std::vector<Mesh> meshes = mRenderer->resourceDelegate->createMeshes(meshDatas);
+        //mRenderer->objectDelegate->setModelMesh(mModelAttatchment, meshes[0], CreateSkeleton());
+        auto meshDatas = MeshLoader::LoadFromFile("../../../Robot.fbx");
         std::vector<Mesh> meshes = mRenderer->resourceDelegate->createMeshes(meshDatas);
-        mRenderer->objectDelegate->setModelMesh(mModelAttatchment, meshes[0], CreateSkeleton());
+        mRenderer->objectDelegate->setModelMesh(mModelAttatchment, meshes[0]);
         mRenderer->objectDelegate->setModelColorTexture(mModelAttatchment, mRenderer->resourceDelegate->createTexture("../../../sword_c.png"));
-        Animation animation = CreateAnimation();
-        mRenderer->objectDelegate->setModelAnimations(mModelAttatchment, &animation, 1);
-        mRenderer->objectDelegate->setModelAnimation(mModelAttatchment, "Test Animation");
+        Transform modelTransform;
+        modelTransform.rotation = Quat::FromAxisAngle(simd_make_float3(1, 0, 0), DEG_TO_RAD(-90));
+        mRenderer->objectDelegate->setGroupTransform(mModel, modelTransform);
+//        Animation animation = CreateAnimation();
+//        mRenderer->objectDelegate->setModelAnimations(mModelAttatchment, &animation, 1);
+//        mRenderer->objectDelegate->setModelAnimation(mModelAttatchment, "Test Animation");
     }
     
     return self;
@@ -133,9 +140,17 @@ Animation CreateAnimation()
 
 
 - (void)drawInMTKView: (nonnull MTKView *)view
-{  
+{
     auto duration = std::chrono::high_resolution_clock::now().time_since_epoch();
     auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+    
+    static float deg = 0.0f;
+    deg = 0.05f * millis;
+    Transform t;
+    t.rotation = Quat::FromAxisAngle(simd_make_float3(1, 0, 0), DEG_TO_RAD(-90));
+    t.rotation = simd_mul(Quat::FromAxisAngle(simd_make_float3(0, 1, 0), DEG_TO_RAD(deg)), t.rotation);
+    mRenderer->objectDelegate->setGroupTransform(mModel, t);
+    
     mRenderer->draw(view, millis);
 }
 

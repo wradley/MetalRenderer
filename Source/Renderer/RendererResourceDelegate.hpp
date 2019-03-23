@@ -17,7 +17,7 @@ public:
                              std::vector<id> &textures);
     ~RendererResourceDelegate();
 
-    std::vector<Mesh> createMeshes(std::vector<std::shared_ptr<MeshData>> datas);
+    std::vector<Mesh> createMeshes(std::shared_ptr<std::vector<MeshData>> datas);
     uint64_t createTexture(const char *fp);
 
 private:
