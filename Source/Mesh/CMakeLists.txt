@@ -1,9 +1,6 @@
 target_sources(MetalRenderer
     PRIVATE
-        CPUMesh.hpp
-        CPUMesh.cpp
-        GPUMesh.hpp
-        GPUMesh.cpp
+        MeshData.hpp
         MeshLoader.hpp
         MeshLoader.cpp
 )

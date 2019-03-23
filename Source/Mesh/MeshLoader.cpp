@@ -10,30 +10,30 @@ FbxScene* LoadScene(FbxManager *fbxManager, const char *filepath)
     int sdkMajor,  sdkMinor,  sdkRevision;
     int fileMajor, fileMinor, fileRevision;
     FbxManager::GetFileFormatVersion(sdkMajor, sdkMinor, sdkRevision);
-    
+
     FbxIOSettings *ioSettings = FbxIOSettings::Create(fbxManager, IOSROOT);
     if (!ioSettings) {
         std::cout << "Could not create fbx io settings" << std::endl;
         fbxManager->Destroy();
         return nullptr;
     }
-    
+
     fbxManager->SetIOSettings(ioSettings);
-    
+
     FbxScene *scene = FbxScene::Create(fbxManager, "Root Scene");
     if (!scene) {
         std::cout << "Could not create fbx scene" << std::endl;
         fbxManager->Destroy();
         return nullptr;
     }
-    
+
     FbxImporter *importer = FbxImporter::Create(fbxManager, "Scene importer");
     if (!importer) {
         std::cout << "Could not create fbx importer" << std::endl;
         fbxManager->Destroy();
         return nullptr;
     }
-    
+
     bool status = importer->Initialize(filepath, -1, fbxManager->GetIOSettings());
     importer->GetFileVersion(fileMajor, fileMinor, fileRevision);
     if (!status) {
@@ -46,16 +46,16 @@ FbxScene* LoadScene(FbxManager *fbxManager, const char *filepath)
         fbxManager->Destroy();
         return nullptr;
     }
-    
+
     status = importer->Import(scene);
     if (!status) {
         std::cout << "Could not load fbx scene from file: " << filepath << std::endl;
         fbxManager->Destroy();
         return nullptr;
     }
-    
+
     importer->Destroy();
-    
+
     std::cout << "Loading fbx file: " << filepath << std::endl;
     return scene;
 }
@@ -65,7 +65,7 @@ simd_float3 GetNormal(FbxMesh *mesh, int controlPoint, int vertex)
 {
     simd_float3 ret = simd_make_float3(0.0f, 0.0f, 0.0f);
     FbxGeometryElementNormal *normalElement = mesh->GetElementNormal(0);
-    
+
     if (normalElement) {
         switch (normalElement->GetMappingMode()) {
             case FbxGeometryElement::eByControlPoint:
@@ -106,7 +106,7 @@ simd_float3 GetNormal(FbxMesh *mesh, int controlPoint, int vertex)
                 break;
         }
     }
-    
+
     return ret;
 }
 
@@ -149,51 +149,51 @@ simd_float2 GetUV(FbxMesh *mesh, int controlPoint, int vertex)
                 break;
         }
     }
-    
+
     return uv;
 }
 
 
-std::shared_ptr<CPUMesh> ProccessMesh(FbxMesh *mesh)
+std::shared_ptr<MeshData> ProccessMesh(FbxMesh *mesh)
 {
-    auto meshData = std::make_shared<CPUMesh>();
-    
+    auto meshData = std::make_shared<MeshData>();
+
     if (!mesh->IsTriangleMesh()) {
         std::cout << "Mesh is not triangulated" << std::endl;
         return meshData;
     }
-    
+
     auto ctrlPts = mesh->GetControlPoints();
     int triangleCount = mesh->GetPolygonCount();
-    
+
     int counter = 0;
     for (int i = 0; i < triangleCount; ++i) {
         for (int j = 0; j < 3; ++j) {
             int index = mesh->GetPolygonVertex(i, j);
             meshData->indices.push_back(counter);
-            
+
             Vertex v;
             v.position = simd_make_float3(ctrlPts[index][0], ctrlPts[index][1], ctrlPts[index][2]);
             v.normal = GetNormal(mesh, index, counter);
             v.uv = GetUV(mesh, index, counter);
             meshData->vertices.push_back(v);
-            
+
             ++counter;
         }
     }
-    
+
     return meshData;
 }
 
 
-void ProccessNode(FbxNode *node, std::vector<std::shared_ptr<CPUMesh>> &meshDatas)
+void ProccessNode(FbxNode *node, std::vector<std::shared_ptr<MeshData>> &meshDatas)
 {
     FbxMesh *mesh = node->GetMesh();
     if (mesh) {
-        std::shared_ptr<CPUMesh> meshData = ProccessMesh(mesh);
+        std::shared_ptr<MeshData> meshData = ProccessMesh(mesh);
         if (meshData) meshDatas.push_back(meshData);
     }
-    
+
     int childCount = node->GetChildCount();
     for (int i = 0; i < childCount; ++i) {
         ProccessNode(node->GetChild(i), meshDatas);
@@ -201,24 +201,24 @@ void ProccessNode(FbxNode *node, std::vector<std::shared_ptr<CPUMesh>> &meshData
 }
 
 
-std::vector<std::shared_ptr<CPUMesh>> MeshLoader::LoadFromFile(const char *filepath)
+std::vector<std::shared_ptr<MeshData>> MeshLoader::LoadFromFile(const char *filepath)
 {
-    std::vector<std::shared_ptr<CPUMesh>> meshDatas;
-    
+    std::vector<std::shared_ptr<MeshData>> meshDatas;
+
     FbxManager *manager = FbxManager::Create();
     if (!manager) {
         std::cout << "Could not create fbx manager" << std::endl;
         return meshDatas;
     }
-    
+
     FbxScene *scene = LoadScene(manager, filepath);
     FbxGeometryConverter geomConverter(manager);
     geomConverter.Triangulate(scene, true);
     FbxNode *rootNode = scene->GetRootNode();
-    
+
     if (rootNode) ProccessNode(rootNode, meshDatas);
-    
+
     manager->Destroy();
-    
+
     return meshDatas;
 }

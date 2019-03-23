@@ -1,0 +1,20 @@
+target_sources(MetalRenderer
+    PRIVATE
+        Animation.cpp
+        Animation.hpp
+        InternalCamera.cpp
+        InternalCamera.hpp
+        InternalGroup.cpp
+        InternalGroup.hpp
+        InternalModel.cpp
+        InternalModel.hpp
+        Mesh.hpp
+        Renderer.hpp
+        Renderer.mm
+        RendererObjectDelegate.hpp
+        RendererObjectDelegate.mm
+        RendererResourceDelegate.hpp
+        RendererResourceDelegate.mm
+        Skeleton.cpp
+        Skeleton.hpp
+)

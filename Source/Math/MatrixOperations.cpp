@@ -37,6 +37,14 @@ namespace Matrix
     }
     
     
+    simd_float4x4 Translation(simd_float3 pos)
+    {
+        simd_float4x4 mat = matrix_identity_float4x4;
+        mat.columns[3] = simd_make_float4(pos, 1.0f);
+        return mat;
+    }
+    
+    
     simd_float4x4 Rotation(vector_float3 axis, float t)
     {
         axis = vector_normalize(axis);

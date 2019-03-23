@@ -2,15 +2,15 @@
 #pragma once
 #include <vector>
 #include "../ShaderTypes.h"
+#include "../Renderer/Skeleton.hpp"
 
 
-class CPUMesh
+class MeshData
 {
 public:
-    
+
     std::vector<Vertex> vertices;
     std::vector<Index> indices;
+    Skeleton skeleton;
     
 };
-
-
