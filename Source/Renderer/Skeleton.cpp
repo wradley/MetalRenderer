@@ -40,6 +40,7 @@ Skeleton::Skeleton(Skeleton &&s) :
     boneCount(s.boneCount)
 {
     s.parents = nullptr;
+    s.transforms = nullptr;
 }
 
 

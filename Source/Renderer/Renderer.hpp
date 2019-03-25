@@ -21,7 +21,7 @@ public:
 
     uint64_t getRootGroup();
     void setCamera(uint64_t cam);
-    void draw(id view, uint64_t time);
+    void draw(id view, double time);
 
     std::unique_ptr<RendererObjectDelegate> objectDelegate;
     std::unique_ptr<RendererResourceDelegate> resourceDelegate;
@@ -29,8 +29,8 @@ public:
 private:
 
     void initializeInternals();
-    void drawModels(id encoder, uint64_t time);
-    void updateAnimations(uint64_t time);
+    void drawModels(id encoder, double time);
+    void updateAnimations(double time);
     void updateUniforms();
 
     simd_float4x4 calcWorldMatrix(const InternalGroup &g) const;

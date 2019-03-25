@@ -21,7 +21,7 @@ Skeleton CreateSkeleton()
 }
 
 
-std::shared_ptr<MeshData> CreatePlane()
+MeshData CreatePlane()
 {
     Vertex verts[] = {
         {simd_make_float3(-1,-1, 0), simd_make_float3(0, 0, 1), simd_make_float2(0, 0), simd_make_int4(0, 0, 0, 0), simd_make_float4(1, 0, 0, 0)},
@@ -35,44 +35,48 @@ std::shared_ptr<MeshData> CreatePlane()
         3, 1, 0
     };
 
-    std::shared_ptr<MeshData> mesh(new MeshData);
-    mesh->vertices.resize(sizeof(verts)/sizeof(Vertex));
-    mesh->indices.resize(sizeof(indices)/sizeof(Index));
-    memcpy(&mesh->vertices[0], &verts, sizeof(verts));
-    memcpy(&mesh->indices[0], &indices, sizeof(indices));
+    MeshData mesh;
+    mesh.vertices.resize(sizeof(verts)/sizeof(Vertex));
+    mesh.indices.resize(sizeof(indices)/sizeof(Index));
+    memcpy(&mesh.vertices[0], &verts, sizeof(verts));
+    memcpy(&mesh.indices[0], &indices, sizeof(indices));
     
     Skeleton skeleton = CreateSkeleton();
-    mesh->skeleton = skeleton;
+    mesh.skeleton = skeleton;
     return mesh;
 }
 
 
 Animation CreateAnimation()
 {
-    KeyFrame frames[3];
+    Channel channels[2];
     
-    KeyFrame &frame0 = frames[0];
-    frame0.frameNumber = 0;
-    frame0.transformCount = 2;
-    frame0.transforms = new AnimationTransform[2];
-    frame0.transforms[0].position = simd_make_float3( 0, 0, 0);
-    frame0.transforms[1].position = simd_make_float3(-1, 0, 0);
-    frame0.transforms[0].orientation = Quat::FromAxisAngle(simd_make_float3(0, 0, 1), DEG_TO_RAD(45));
-    frame0.transforms[1].orientation = Quat::FromAxisAngle(simd_make_float3(0, 0, 1), DEG_TO_RAD(45));
+    // parent bone
+    KeyFrame parentFrame;
+    parentFrame.frameNumber = 0;
+    parentFrame.transform = AnimationTransform();
+    channels[0] = Channel(&parentFrame, 1);
     
-    KeyFrame &frame1 = frames[1];
-    frame1.frameNumber = 12;
-    frame1.transformCount = 2;
-    frame1.transforms = new AnimationTransform[2];
-    frame1.transforms[1].orientation = Quat::FromAxisAngle(simd_make_float3(0, 0, 1), DEG_TO_RAD(-45));
-    frame1.transforms[0].position = simd_make_float3(0, 0, 0);
-    frame1.transforms[1].position = simd_make_float3(1, 0, 0);
+    // child bone
+    KeyFrame childFrames[3];
+    childFrames[0].frameNumber = 0;
+    childFrames[0].transform = AnimationTransform();
+    //childFrames[0].transform.position.x = -1;
+    childFrames[0].transform.rotation = Quat::FromAxisAngle(simd_make_float3(0, 0, 1), DEG_TO_RAD(45));
+    childFrames[1].frameNumber = 11;
+    childFrames[1].transform = AnimationTransform();
+    //childFrames[1].transform.position.x = 1;
+    childFrames[2] = childFrames[0];
+    childFrames[2].frameNumber = 24;
+    channels[1] = Channel(childFrames, 3);
     
-    frames[2] = frames[0];
-    frames[2].frameNumber = 23;
+//    const Channel *channels,
+//    uint32_t channelCount,
+//    float fps,
+//    uint32_t totalFrames,
+//    const std::string &name
     
-    //KeyFrame *keyFrames, uint32_t keyFrameCount, uint64_t fps, uint64_t totalFrames, const std::string &name);
-    return Animation(frames, 3, 12, 24, "Test Animation");
+    return Animation(channels, 2, 24, 24, "Test Animation");
 }
 
 
@@ -104,29 +108,30 @@ Animation CreateAnimation()
         mCamera = mRenderer->objectDelegate->createGroup(rootGroup);
         mCameraAttachment = mRenderer->objectDelegate->createCamera(mCamera);
         Transform t;
-        t.position[1] = 3;
         t.position[2] = 8;
         t.rotation = Quat::FromAxisAngle(simd_make_float3(0, 1, 0), DEG_TO_RAD(180));
         mRenderer->objectDelegate->setGroupTransform(mCamera, t);
         mRenderer->setCamera(mCameraAttachment);
-        
+
         mModel = mRenderer->objectDelegate->createGroup(rootGroup);
         mModelAttatchment = mRenderer->objectDelegate->createModel(mModel);
-//        std::shared_ptr<MeshData> cube = CreatePlane();
-//        std::vector<std::shared_ptr<MeshData>> meshDatas;
-//        meshDatas.push_back(cube);
-//        std::vector<Mesh> meshes = mRenderer->resourceDelegate->createMeshes(meshDatas);
-        //mRenderer->objectDelegate->setModelMesh(mModelAttatchment, meshes[0], CreateSkeleton());
-        auto meshDatas = MeshLoader::LoadFromFile("../../../Robot.fbx");
+        auto meshDatas = std::make_shared<std::vector<MeshData>>();
+        meshDatas->push_back(CreatePlane());
+        
         std::vector<Mesh> meshes = mRenderer->resourceDelegate->createMeshes(meshDatas);
-        mRenderer->objectDelegate->setModelMesh(mModelAttatchment, meshes[0]);
+        mRenderer->objectDelegate->setModelMesh(mModelAttatchment, meshes[0], CreateSkeleton());
+        
+//        auto meshDatas = MeshLoader::LoadFromFile("../../../Robot.fbx");
+//        std::vector<Mesh> meshes = mRenderer->resourceDelegate->createMeshes(meshDatas);
+//        mRenderer->objectDelegate->setModelMesh(mModelAttatchment, meshes[0]);
         mRenderer->objectDelegate->setModelColorTexture(mModelAttatchment, mRenderer->resourceDelegate->createTexture("../../../sword_c.png"));
-        Transform modelTransform;
-        modelTransform.rotation = Quat::FromAxisAngle(simd_make_float3(1, 0, 0), DEG_TO_RAD(-90));
-        mRenderer->objectDelegate->setGroupTransform(mModel, modelTransform);
-//        Animation animation = CreateAnimation();
-//        mRenderer->objectDelegate->setModelAnimations(mModelAttatchment, &animation, 1);
-//        mRenderer->objectDelegate->setModelAnimation(mModelAttatchment, "Test Animation");
+//        Transform modelTransform;
+//        modelTransform.rotation = Quat::FromAxisAngle(simd_make_float3(1, 0, 0), DEG_TO_RAD(-90));
+//        mRenderer->objectDelegate->setGroupTransform(mModel, modelTransform);
+        Animation animation = CreateAnimation();
+        mRenderer->objectDelegate->setModelAnimations(mModelAttatchment, &animation, 1);
+        mRenderer->objectDelegate->setModelAnimation(mModelAttatchment, "Test Animation");
+        
     }
     
     return self;
@@ -141,17 +146,20 @@ Animation CreateAnimation()
 
 - (void)drawInMTKView: (nonnull MTKView *)view
 {
-    auto duration = std::chrono::high_resolution_clock::now().time_since_epoch();
-    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+    static auto start = std::chrono::high_resolution_clock::now();
+    //auto duration = std::chrono::high_resolution_clock::now().time_since_epoch();
+    auto now = std::chrono::high_resolution_clock::now();
+    auto micro = std::chrono::duration_cast<std::chrono::microseconds>(now - start).count();
+    double time = ((double)micro) / 1000000.0;
     
-    static float deg = 0.0f;
-    deg = 0.05f * millis;
-    Transform t;
-    t.rotation = Quat::FromAxisAngle(simd_make_float3(1, 0, 0), DEG_TO_RAD(-90));
-    t.rotation = simd_mul(Quat::FromAxisAngle(simd_make_float3(0, 1, 0), DEG_TO_RAD(deg)), t.rotation);
-    mRenderer->objectDelegate->setGroupTransform(mModel, t);
+//    static float deg = 0.0f;
+//    deg = 10.0 * time;
+//    Transform t;
+//    t.rotation = Quat::FromAxisAngle(simd_make_float3(1, 0, 0), DEG_TO_RAD(-90));
+//    t.rotation = simd_mul(Quat::FromAxisAngle(simd_make_float3(0, 1, 0), DEG_TO_RAD(deg)), t.rotation);
+//    mRenderer->objectDelegate->setGroupTransform(mModel, t);
     
-    mRenderer->draw(view, millis);
+    mRenderer->draw(view, time);
 }
 
 

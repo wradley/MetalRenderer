@@ -9,7 +9,7 @@ InternalModel::InternalModel(uint64_t Parent) :
     animations(nullptr),
     animationCount(0),
     currAnimation(0),
-    animationStartTime(0)
+    animationLoopStartTime(0)
 {}
 
 
@@ -18,7 +18,7 @@ InternalModel::InternalModel(const InternalModel &m) :
     animations(new Animation[m.animationCount]),
     animationCount(m.animationCount),
     currAnimation(m.currAnimation),
-    animationStartTime(m.animationStartTime),
+    animationLoopStartTime(m.animationLoopStartTime),
     skeleton(m.skeleton),
     mesh(m.mesh),
     colorTexture(m.colorTexture)
@@ -32,7 +32,7 @@ InternalModel::InternalModel(InternalModel &&m) :
     animations(m.animations),
     animationCount(m.animationCount),
     currAnimation(m.currAnimation),
-    animationStartTime(m.animationStartTime),
+    animationLoopStartTime(m.animationLoopStartTime),
     skeleton(std::move(m.skeleton)),
     mesh(m.mesh),
     colorTexture(m.colorTexture)
@@ -49,7 +49,7 @@ InternalModel& InternalModel::operator= (const InternalModel &m)
     animations = new Animation[m.animationCount];
     animationCount = m.animationCount;
     currAnimation = m.currAnimation;
-    animationStartTime = m.animationStartTime;
+    animationLoopStartTime = m.animationLoopStartTime;
     colorTexture = m.colorTexture;
     memcpy(animations, m.animations, sizeof(Animation) * animationCount);
     return *this;
@@ -61,58 +61,56 @@ InternalModel::~InternalModel()
     if (animations) delete[] animations;
 }
 
-
-void InternalModel::calculateBoneMatrices(void *dst, uint64_t time)
+void InternalModel::calculateBoneMatrices(void *dst, double time)
 {
     Animation &animation = animations[currAnimation];
-    BoneData *boneDatas = (BoneData*) dst;
-    uint64_t animationDuration = animation.frameToTime(animation.totalFrames - 1);
-    
-    // reset animations if unplayed or over the duration of the loop
-    if (animationStartTime == 0) animationStartTime = time;
-    if ((time - animationStartTime) > animationDuration) animationStartTime = time;
-    uint64_t elapsedTime = time - animationStartTime;
-    
-    // find surrounding frames
-    uint32_t prevFrameIndex = animation.keyFrameCount - 1;
-    for (int i = 0; i < animation.keyFrameCount; ++i) {
-        uint64_t frameTime = animation.frameToTime(animation.keyFrames[i].frameNumber);
-        if (elapsedTime < frameTime) {
-            prevFrameIndex = i - 1;
-            break;
-        }
-    }
-    uint32_t nextFrameIndex = prevFrameIndex + 1;
-    if (nextFrameIndex == animation.keyFrameCount) nextFrameIndex = 0;
-    KeyFrame &prevFrame = animation.keyFrames[prevFrameIndex];
-    KeyFrame &nextFrame = animation.keyFrames[nextFrameIndex];
+    BoneData *boneDatas = reinterpret_cast<BoneData*>(dst);
+    double totalLoopTime = (double)animation.totalFrames / animation.fps;
+    if (animationLoopStartTime == 0) animationLoopStartTime = time;
+    if (time > (animationLoopStartTime + totalLoopTime))
+        animationLoopStartTime = time;
+    time -= animationLoopStartTime;
+    uint32_t frame = (uint32_t) (time * (double)animation.fps);
 
-    // calculate interpolation
-    uint64_t prevTime = animation.frameToTime(prevFrame.frameNumber);
-    uint64_t nextTime = animation.frameToTime(nextFrame.frameNumber);
-    uint64_t currTime = elapsedTime;
-    if (nextTime < prevTime) nextTime += animationDuration;
-    if (currTime < prevTime) currTime += animationDuration;
-    nextTime = nextTime - prevTime;
-    currTime = currTime - prevTime;
-    float interp = (float)currTime / (float)nextTime;
-    if (interp > 1.0f) interp = 1.0f;
-    interp = (cosf((interp * PI) + PI) + 1) / 2.0f; // cosine interpolation
-
-    // calculate all interpolated bone transforms
-    for (int i = 0; i < skeleton.boneCount; ++i)
+    // iterate all bones from parents down to child bones
+    for (uint32_t boneIndex = 0; boneIndex < animation.channelCount; ++boneIndex)
     {
-        AnimationTransform &prevTransform = prevFrame.transforms[i];
-        AnimationTransform &nextTransform = nextFrame.transforms[i];
-
-        simd_quatf interpRot = simd_slerp(prevTransform.orientation, nextTransform.orientation, interp);
-        simd_float3 interpTrans = simd_mix(prevTransform.position, nextTransform.position, interp);
-        simd_float4x4 rotMat = simd_matrix4x4(interpRot);
-        simd_float4x4 transMat = Matrix::Translation(interpTrans);
-        simd_float4x4 matrix = simd_mul(skeleton.transforms[i].toMat(), simd_mul(transMat, rotMat));
-
-        if (i) boneDatas[i].globalTransform = simd_mul(boneDatas[skeleton.parents[i]].globalTransform, matrix);
-        else boneDatas[i].globalTransform = matrix;
+        // calculate interpolation
+        Channel &channel = animation.channels[boneIndex];
+        uint32_t prevIndex = channel.keyFrameBefore(frame);
+        uint32_t nextIndex = (prevIndex == (channel.keyFrameCount-1)) ? prevIndex : prevIndex + 1;
+        double interp;
+        if (prevIndex == nextIndex)
+            interp = 0.0;
+        else {
+            double prevKeyTime = ((double)channel.keyFrames[prevIndex].frameNumber) / animation.fps;
+            double currKeyTime = time;
+            double nextKeyTime = ((double)channel.keyFrames[nextIndex].frameNumber) / animation.fps;
+            if (currKeyTime < prevKeyTime) currKeyTime += totalLoopTime;
+            if (nextKeyTime < prevKeyTime) nextKeyTime += totalLoopTime;
+            currKeyTime -= prevKeyTime;
+            nextKeyTime -= prevKeyTime;
+            interp = currKeyTime / nextKeyTime;
+        }
+//        if (nextKeyTime == 0) interp = 1;
+//        else interp = currKeyTime / nextKeyTime;
+        
+        // calculate interpolated transform
+        AnimationTransform &prevTform = channel.keyFrames[prevIndex].transform;
+        AnimationTransform &nextTform = channel.keyFrames[nextIndex].transform;
+        simd_float3 interpPos = simd_mix(prevTform.position, nextTform.position, interp);
+        simd_quatf interpRot = simd_slerp(prevTform.rotation, nextTform.rotation, interp);
+        simd_float4x4 localAnim = simd_mul(Matrix::Translation(interpPos), simd_matrix4x4(interpRot));
+        simd_float4x4 localMat = simd_mul(skeleton.transforms[boneIndex].toMat(), localAnim);
+        
+        // if this bone is not the root
+        if (boneIndex) {
+            uint32_t parent = skeleton.parents[boneIndex];
+            boneDatas[boneIndex].globalTransform = simd_mul(boneDatas[parent].globalTransform, localMat);
+        }
+        
+        // if this is the root bone
+        else boneDatas[boneIndex].globalTransform = localMat;
     }
 }
 

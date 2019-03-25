@@ -112,7 +112,7 @@ void Renderer::setCamera(uint64 cam)
 }
 
 
-void Renderer::draw(id View, uint64 time)
+void Renderer::draw(id View, double time)
 {
     if (mCurrCamera == NIL_INDEX) {
         std::cout << "Renderer's current camera is not set." << std::endl;
@@ -166,7 +166,7 @@ void Renderer::initializeInternals()
 }
 
 
-void Renderer::drawModels(id Encoder, uint64 time)
+void Renderer::drawModels(id Encoder, double time)
 {
     id<MTLRenderCommandEncoder> encoder = Encoder;
     int iteration = 0;
@@ -212,7 +212,7 @@ void Renderer::drawModels(id Encoder, uint64 time)
 }
 
 
-void Renderer::updateAnimations(uint64 time)
+void Renderer::updateAnimations(double time)
 {
     int iteration = 0;
     for (InternalModel &model : mModels)

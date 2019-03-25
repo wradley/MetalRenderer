@@ -6,35 +6,147 @@
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <iostream>
+#include <map>
 #include <string>
 
 
-static void LoadMesh(const aiMesh *mesh, MeshData &meshData)
+// weights, boneIDs, and weightsFound must be resized to bone count before calling function
+static void FindBone(const std::map<std::string, aiBone*> &bones,
+                     const aiNode *node,
+                     uint32_t parent,
+                     std::vector<uint32_t> &parents,
+                     std::vector<AnimationTransform> &transforms,
+                     std::vector<Vertex> &verts,
+                     std::vector<simd_int4> &weightsFound)
 {
-    unsigned int vertexCount = mesh->mNumVertices;
-    unsigned int faceCount = mesh->mNumFaces;
-    meshData.vertices.resize(vertexCount);
-    meshData.indices.reserve(faceCount * 3);
+    if (bones.find(node->mName.C_Str()) != bones.end())
+    {
+        const aiBone *bone = bones.at(node->mName.C_Str());
+        uint32_t self = parents.size();
+        
+        // get transform from bone
+        AnimationTransform transform;
+        aiQuaterniont<float> rotation;
+        aiVector3t<float> position;
+        bone->mOffsetMatrix.DecomposeNoScaling(rotation, position);
+        transform.rotation = simd_quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+        transform.position = simd_make_float3(position.x, position.y, position.z);
+        
+        // get weights
+        for (int i = 0; i < bone->mNumWeights; ++i)
+        {
+            aiVertexWeight weight = bone->mWeights[i];
+            
+            for (int j = 0; j < 4; ++j)
+            {
+                // add to next free spot in bone weights
+                if (!weightsFound[weight.mVertexId][j])
+                {
+                    weightsFound[weight.mVertexId][j] = 1;
+                    verts[weight.mVertexId].boneWeights[j] = weight.mWeight;
+                    verts[weight.mVertexId].boneIDs[j] = self;
+                    break;
+                }
+            }
+        }
+        
+        // set parent and add to list
+        parents.push_back(parent);
+        transforms.push_back(transform);
+        parent = self;
+    }
     
-    for (unsigned int i = 0; i < vertexCount; ++i)
+    // add children
+    for (unsigned int i = 0; i < node->mNumChildren; ++i)
+        FindBone(bones, node->mChildren[i], parent, parents, transforms, verts, weightsFound);
+}
+
+
+// verts should be filled out before calling
+static void LoadSkeletonAndWeights(const aiScene *scene,
+                                   const aiMesh *mesh,
+                                   Skeleton &skeleton,
+                                   std::vector<Vertex> &verts)
+{
+    std::map<std::string, aiBone*> bones;
+    for (unsigned int i = 0; i < mesh->mNumBones; ++i)
+        bones[mesh->mBones[i]->mName.C_Str()] = mesh->mBones[i];
+    
+    std::vector<uint32_t> parents;
+    std::vector<AnimationTransform> transforms;
+    parents.reserve(bones.size());
+    transforms.reserve(bones.size());
+
+    std::vector<simd_int4> weightsFound;
+    weightsFound.resize(verts.size(), simd_make_int4(0, 0, 0, 0));
+    
+    FindBone(bones, scene->mRootNode, 0, parents, transforms, verts, weightsFound);
+    skeleton = Skeleton(&parents[0], &transforms[0], bones.size());
+}
+
+
+static void LoadMesh(const aiScene *scene, const aiMesh *mesh, MeshData &meshData)
+{
+    meshData.vertices.resize(mesh->mNumVertices);
+    meshData.indices.reserve(mesh->mNumFaces * 3);
+    
+    for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
     {
         Vertex &vertex = meshData.vertices[i];
         vertex.position = simd_make_float3(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
         vertex.normal = simd_make_float3(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
         if (mesh->mTextureCoords[0])
             vertex.uv = simd_make_float2(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);
+        vertex.boneWeights = simd_make_float4(0, 0, 0, 0);
     }
     
-    for (unsigned int i = 0; i < faceCount; ++i)
+    for (unsigned int i = 0; i < mesh->mNumFaces; ++i)
     {
         meshData.indices.push_back(mesh->mFaces[i].mIndices[0]);
         meshData.indices.push_back(mesh->mFaces[i].mIndices[1]);
         meshData.indices.push_back(mesh->mFaces[i].mIndices[2]);
     }
+    
+    if (mesh->HasBones())
+        LoadSkeletonAndWeights(scene, mesh, meshData.skeleton, meshData.vertices);
 }
 
 
-static void LoadScene(const std::string &filepath, std::vector<MeshData> &meshDatas)
+// return false if no channels are found
+//static bool LoadAnimation(const aiAnimation *animation, Animation &ret)
+//{
+//    // KeyFrame *keyFrames, uint32_t keyFrameCount, uint64_t fps, uint64_t totalFrames, const std::string &name
+//    float fps = animation->mTicksPerSecond;
+//    std::string name(animation->mName.C_Str());
+//    uint64_t totalFrames = animation->mDuration;
+//    unsigned int boneCount = animation->mNumChannels;
+//    if (!boneCount) return false;
+//
+//    unsigned int keyFrameCount = animation->mChannels[0]->mNumPositionKeys;
+//    KeyFrame *keyFrames = new KeyFrame[keyFrameCount];
+//    for (unsigned int kf = 0; kf < keyFrameCount; ++kf)
+//    {
+//        keyFrames[kf].frameNumber = animation->mChannels[0]->mPositionKeys[0].mTime * fps;
+//        keyFrames[kf].transformCount = boneCount;
+//        keyFrames[kf].transforms = new AnimationTransform[boneCount];
+//        for (unsigned int bn = 0; bn < boneCount; ++bn)
+//        {
+//            keyFrames[kf].transforms[bn].position = simd_make_float3(animation->mChannels[bn]->mPositionKeys[kf].mValue.x,
+//                                                                     animation->mChannels[bn]->mPositionKeys[kf].mValue.y,
+//                                                                     animation->mChannels[bn]->mPositionKeys[kf].mValue.z);
+//            keyFrames[kf].transforms[bn].orientation = simd_quaternion(animation->mChannels[bn]->mRotationKeys[kf].mValue.x,
+//                                                                       animation->mChannels[bn]->mRotationKeys[kf].mValue.y,
+//                                                                       animation->mChannels[bn]->mRotationKeys[kf].mValue.z,
+//                                                                       animation->mChannels[bn]->mRotationKeys[kf].mValue.w);
+//        }
+//    }
+//
+//    ret = Animation(keyFrames, keyFrameCount, fps, totalFrames, name);
+//    return true;
+//}
+
+
+static void LoadScene(const std::string &filepath, std::vector<MeshData> &meshDatas, std::vector<Animation> &animations)
 {
     Assimp::Importer importer;
     const aiScene *scene = importer.ReadFile(filepath,
@@ -42,26 +154,27 @@ static void LoadScene(const std::string &filepath, std::vector<MeshData> &meshDa
                                              aiProcess_GenSmoothNormals |
                                              aiProcess_JoinIdenticalVertices |
                                              aiProcess_FlipWindingOrder);
-    if (scene) {
-        unsigned int meshCount = scene->mNumMeshes;
-        meshDatas.resize(meshCount);
+    if (scene)
+    {
+        meshDatas.resize(scene->mNumMeshes);
+        for (int i = 0; i < scene->mNumMeshes; ++i)
+            LoadMesh(scene, scene->mMeshes[i], meshDatas[i]);
         
-        for (int i = 0; i < meshCount; ++i)
-        {
-            LoadMesh(scene->mMeshes[i], meshDatas[i]);
-        }
+        animations.resize(scene->mNumAnimations);
+//        for (int i = 0; i < scene->mNumAnimations; ++i)
+//            LoadAnimation(scene->mAnimations[i], animations[i]);
     }
     
-    else {
-        std::cout << "Could not load file from: " << filepath << std::endl;
-    }
+    else std::cout << "Could not load file from: " << filepath << std::endl;
+    
 }
 
 
 std::shared_ptr<std::vector<MeshData>> MeshLoader::LoadFromFile(const char *filepath)
 {
     auto meshDatas = new std::vector<MeshData>;
-    LoadScene(filepath, *meshDatas);
+    auto animations = new std::vector<Animation>;
+    LoadScene(filepath, *meshDatas, *animations);
     return std::shared_ptr<std::vector<MeshData>>(meshDatas);
 }
 

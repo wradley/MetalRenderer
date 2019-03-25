@@ -3,27 +3,27 @@
 #include "../Math/QuaternionOperations.hpp"
 
 
-AnimationTransform::AnimationTransform() :
-    orientation(Quat::FromAxisAngle(simd_make_float3(0, 1, 0), 0)),
-    position(simd_make_float3(0, 0, 0))
+AnimationTransform::AnimationTransform(simd_float3 pos, simd_quatf rot) :
+    rotation(rot),
+    position(pos)
 {}
 
 
 AnimationTransform::AnimationTransform(const AnimationTransform &t) :
-    orientation(t.orientation),
+    rotation(t.rotation),
     position(t.position)
 {}
 
 
 AnimationTransform::AnimationTransform(AnimationTransform &&t) :
-    orientation(t.orientation),
+    rotation(t.rotation),
     position(t.position)
 {}
 
 
 AnimationTransform& AnimationTransform::operator= (const AnimationTransform &t)
 {
-    orientation = t.orientation;
+    rotation = t.rotation;
     position = t.position;
     return *this;
 }
@@ -33,123 +33,160 @@ AnimationTransform::~AnimationTransform()
 {}
 
 
-KeyFrame::KeyFrame() :
-    transforms(nullptr),
-    transformCount(0),
-    frameNumber(0)
+KeyFrame::KeyFrame(const AnimationTransform &at, uint32_t fn) :
+    transform(at),
+    frameNumber(fn)
 {}
 
 
-KeyFrame::KeyFrame(AnimationTransform *Transforms, uint32_t Count, uint64_t FrameNumber) :
-    transforms(new AnimationTransform[Count]),
-    transformCount(Count),
-    frameNumber(FrameNumber)
-{
-    for (int i = 0; i < transformCount; ++i) {
-        transforms[i] = Transforms[i];
-    }
-}
-
-
 KeyFrame::KeyFrame(const KeyFrame &f) :
-    transforms(new AnimationTransform[f.transformCount]),
-    transformCount(f.transformCount),
+    transform(f.transform),
     frameNumber(f.frameNumber)
-{
-    for (int i = 0; i < transformCount; ++i) {
-        transforms[i] = f.transforms[i];
-    }
-}
+{}
 
 
 KeyFrame::KeyFrame(KeyFrame &&f) :
-    transforms(f.transforms),
-    transformCount(f.transformCount),
+    transform(f.transform),
     frameNumber(f.frameNumber)
-{
-    f.transforms = nullptr;
-}
+{}
 
 
 KeyFrame& KeyFrame::operator= (const KeyFrame &f)
 {
-    transforms = new AnimationTransform[f.transformCount];
-    transformCount = f.transformCount;
+    transform = f.transform;
     frameNumber = f.frameNumber;
-    for (int i = 0; i < transformCount; ++i) {
-        transforms[i] = f.transforms[i];
-    }
     return *this;
 }
 
 
 KeyFrame::~KeyFrame()
+{}
+
+
+Channel::Channel() :
+    keyFrames(nullptr),
+    keyFrameCount(0)
+{}
+
+
+Channel::Channel(const KeyFrame *frames, uint32_t count) :
+    keyFrames(new KeyFrame[count]),
+    keyFrameCount(count)
 {
-    if (transforms) delete[] transforms;
+    for (uint32_t i = 0; i < keyFrameCount; ++i)
+        keyFrames[i] = frames[i];
+}
+
+
+Channel::Channel(const Channel &c) :
+    keyFrames(new KeyFrame[c.keyFrameCount]),
+    keyFrameCount(c.keyFrameCount)
+{
+    for (uint32_t i = 0; i < keyFrameCount; ++i)
+        keyFrames[i] = c.keyFrames[i];
+}
+
+
+Channel::Channel(Channel &&c) :
+    keyFrames(c.keyFrames),
+    keyFrameCount(c.keyFrameCount)
+{
+    c.keyFrames = nullptr;
+}
+
+
+Channel& Channel::operator= (const Channel &c)
+{
+    keyFrames = new KeyFrame[c.keyFrameCount];
+    keyFrameCount = c.keyFrameCount;
+    
+    for (uint32_t i = 0; i < keyFrameCount; ++i)
+        keyFrames[i] = c.keyFrames[i];
+    
+    return *this;
+}
+
+
+Channel::~Channel()
+{
+    if (keyFrames) delete[] keyFrames;
+}
+
+
+uint32_t Channel::keyFrameBefore(uint32_t frame)
+{
+    for (uint32_t i = 0; i < keyFrameCount; ++i) {
+        if (frame < keyFrames[i].frameNumber) return i - 1;
+    }
+    
+    return keyFrameCount - 1;
 }
 
 
 Animation::Animation() :
-    keyFrames(nullptr),
-    keyFrameCount(0),
+    channels(nullptr),
+    channelCount(0),
+    fps(0),
     totalFrames(0),
-    fps(60),
     name("")
 {}
 
 
-Animation::Animation(KeyFrame *KeyFrames, uint32_t KeyFrameCount, uint64_t FPS, uint64_t TotalFrames, const std::string &Name) :
-    keyFrames(new KeyFrame[KeyFrameCount]),
-    keyFrameCount(KeyFrameCount),
-    totalFrames(TotalFrames),
+Animation::Animation(const Channel *Channels,
+                     uint32_t ChannelCount,
+                     float FPS,
+                     uint32_t TotalFrames,
+                     const std::string &Name) :
+    channels(new Channel[ChannelCount]),
+    channelCount(ChannelCount),
     fps(FPS),
+    totalFrames(TotalFrames),
     name(Name)
 {
-    for (int i = 0; i < keyFrameCount; ++i) {
-        keyFrames[i] = KeyFrames[i];
-    }
+    for (uint32_t i = 0; i < channelCount; ++i)
+        channels[i] = Channels[i];
 }
 
 
 Animation::Animation(const Animation &a) :
-    keyFrames(new KeyFrame[a.keyFrameCount]),
-    keyFrameCount(a.keyFrameCount),
-    totalFrames(a.totalFrames),
+    channels(new Channel[a.channelCount]),
+    channelCount(a.channelCount),
     fps(a.fps),
+    totalFrames(a.totalFrames),
     name(a.name)
 {
-    for (int i = 0; i < keyFrameCount; ++i) {
-        keyFrames[i] = a.keyFrames[i];
-    }
+    for (uint32_t i = 0; i < channelCount; ++i)
+        channels[i] = a.channels[i];
 }
 
 
-Animation::Animation(Animation &&a) :
-    keyFrames(a.keyFrames),
-    keyFrameCount(a.keyFrameCount),
-    totalFrames(a.totalFrames),
+Animation::Animation(Animation &&a):
+    channels(a.channels),
+    channelCount(a.channelCount),
     fps(a.fps),
+    totalFrames(a.totalFrames),
     name(a.name)
 {
-    a.keyFrames = nullptr;
+    a.channels = nullptr;
 }
 
 
 Animation& Animation::operator= (const Animation &a)
 {
-    keyFrames = new KeyFrame[a.keyFrameCount];
-    keyFrameCount = a.keyFrameCount;
-    totalFrames = a.totalFrames;
+    channels = new Channel[a.channelCount];
+    channelCount = a.channelCount;
     fps = a.fps;
+    totalFrames = a.totalFrames;
     name = a.name;
-    for (int i = 0; i < keyFrameCount; ++i) {
-        keyFrames[i] = a.keyFrames[i];
-    }
+    
+    for (uint32_t i = 0; i < channelCount; ++i)
+        channels[i] = a.channels[i];
+    
     return *this;
 }
 
 
 Animation::~Animation()
 {
-    if (keyFrames) delete[] keyFrames;
+    if (channels) delete[] channels;
 }

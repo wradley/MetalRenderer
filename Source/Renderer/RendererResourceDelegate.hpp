@@ -36,7 +36,7 @@ private:
     
     std::vector<id> &mBoneBuffers;
     unsigned int mNextFreeBoneOffset;
-    const unsigned int BoneBufferSize = sizeof(simd_float4x4) * 100 * 100;
+    const unsigned int BoneBufferSize = sizeof(BoneData) * 100 * 100;
     
     std::vector<id> &mTextures;
 };

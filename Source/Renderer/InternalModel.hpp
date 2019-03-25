@@ -15,7 +15,7 @@ public:
     InternalModel& operator= (const InternalModel &m);
     ~InternalModel();
 
-    void calculateBoneMatrices(void *dst, uint64_t time);
+    void calculateBoneMatrices(void *dst, double time);
     void calculateBoneInverseMatrices(void *dst);
 
 public:
@@ -25,7 +25,7 @@ public:
     Animation *animations;
     uint32_t animationCount;
     uint32_t currAnimation;
-    uint64_t animationStartTime; // start time of loop in animation
+    double animationLoopStartTime;
     
     Skeleton skeleton;
     Mesh mesh;
