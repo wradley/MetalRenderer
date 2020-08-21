@@ -2,11 +2,20 @@
 #pragma once
 #include <memory>
 #include "MeshData.hpp"
+#include "../Renderer/Skeleton.hpp"
+#include "../Renderer/Animation.hpp"
 
-class MeshLoader
+class SceneLoader
 {
 public:
 
-    static std::shared_ptr<std::vector<MeshData>> LoadFromFile(const char *filepath);
+    struct Data
+    {
+        std::vector<MeshData> meshDatas;
+        Skeleton skeleton;
+        std::vector<Animation> animations;
+    };
+    
+    static std::shared_ptr<Data> LoadFromFile(const char *filepath);
 
 };

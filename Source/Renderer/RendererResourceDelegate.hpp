@@ -4,6 +4,12 @@
 #include "../Mesh/MeshData.hpp"
 #include "Mesh.hpp"
 
+class GPUSkeleton
+{
+public:
+    uint32_t mBuffer;
+    uint32_t mOffset;
+};
 
 class RendererResourceDelegate
 {
@@ -18,8 +24,9 @@ public:
     ~RendererResourceDelegate();
 
     std::vector<Mesh> createMeshes(std::shared_ptr<std::vector<MeshData>> datas);
+    GPUSkeleton createSkeletonBuffer(std::shared_ptr<Skeleton> skeleton);
     uint64_t createTexture(const char *fp);
-
+    
 private:
     
     void assignUniform(uint32_t &buffer, uint32_t &offset);

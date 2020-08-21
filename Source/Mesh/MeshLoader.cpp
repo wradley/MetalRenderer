@@ -85,7 +85,7 @@ static void LoadSkeletonAndWeights(const aiScene *scene,
 }
 
 
-static void LoadMesh(const aiScene *scene, const aiMesh *mesh, MeshData &meshData)
+static void LoadMesh(const aiScene *scene, const aiMesh *mesh, MeshData &meshData, Skeleton &skeleton)
 {
     meshData.vertices.resize(mesh->mNumVertices);
     meshData.indices.reserve(mesh->mNumFaces * 3);
@@ -108,45 +108,168 @@ static void LoadMesh(const aiScene *scene, const aiMesh *mesh, MeshData &meshDat
     }
     
     if (mesh->HasBones())
-        LoadSkeletonAndWeights(scene, mesh, meshData.skeleton, meshData.vertices);
+        LoadSkeletonAndWeights(scene, mesh, skeleton, meshData.vertices);
+}
+
+
+static simd_quatf InterpolateRotations(simd_quatf a,
+                                       simd_quatf b,
+                                       uint32_t frameNumberA,
+                                       uint32_t frameNumberB,
+                                       uint32_t interpFrameNumber)
+{
+    interpFrameNumber -= frameNumberA;
+    frameNumberB -= frameNumberA;
+    if (interpFrameNumber < frameNumberA) interpFrameNumber = frameNumberA; // clamp
+    if (interpFrameNumber > frameNumberB) interpFrameNumber = frameNumberB;
+    float linear = (float)interpFrameNumber / (float)frameNumberB;
+    float interp = Animation::InterpolationConverter(linear);
+    return simd_slerp(a, b, interp);
+}
+
+
+static simd_float3 InterpolatePositions(simd_float3 a,
+                                        simd_float3 b,
+                                        uint32_t frameNumberA,
+                                        uint32_t frameNumberB,
+                                        uint32_t interpFrameNumber)
+{
+    interpFrameNumber -= frameNumberA;
+    frameNumberB -= frameNumberA;
+    if (interpFrameNumber < frameNumberA) interpFrameNumber = frameNumberA; // clamp
+    if (interpFrameNumber > frameNumberB) interpFrameNumber = frameNumberB;
+    float linear = (float)interpFrameNumber / (float)frameNumberB;
+    float interp = Animation::InterpolationConverter(linear);
+    return simd_mix(a, b, interp);
+}
+
+
+// sorts both lists by times their key frames occur
+#include <algorithm>
+static std::vector<KeyFrame> MergeAndInterpolate(std::vector<KeyFrame> &positions,
+                                                 std::vector<KeyFrame> &rotations)
+{
+    std::vector<KeyFrame> ret;
+    
+    std::sort(positions.begin(), positions.end(), [](const KeyFrame &a, const KeyFrame &b){
+        return a.frameNumber < b.frameNumber;
+    });
+    
+    std::sort(rotations.begin(), rotations.end(), [](const KeyFrame &a, const KeyFrame &b){
+        return a.frameNumber < b.frameNumber;
+    });
+    
+    unsigned int p = 0;
+    unsigned int r = 0;
+    while (p < positions.size() && r < rotations.size())
+    {
+        if (positions[p].frameNumber == rotations[r].frameNumber)
+        {
+            KeyFrame kf;
+            kf.frameNumber = positions[p].frameNumber;
+            kf.transform.position = positions[p].transform.position;
+            kf.transform.rotation = positions[p].transform.rotation;
+            ret.push_back(kf);
+            ++p;
+            ++r;
+        }
+        
+        // missing rotation keyframe
+        else if (positions[p].frameNumber < rotations[r].frameNumber)
+        {
+            KeyFrame kf;
+            kf.frameNumber = positions[p].frameNumber;
+            kf.transform.position = positions[p].transform.position;
+            if (r == 0) kf.transform.rotation = rotations[r].transform.rotation; // if no prev rotation
+            else {
+                kf.transform.rotation = InterpolateRotations(rotations[r-1].transform.rotation,
+                                                             rotations[r].transform.rotation,
+                                                             rotations[r-1].frameNumber,
+                                                             rotations[r].frameNumber,
+                                                             positions[p].frameNumber);
+            }
+            ret.push_back(kf);
+            ++p;
+        }
+        
+        // missing position keyframe
+        else if (positions[p].frameNumber < rotations[r].frameNumber)
+        {
+            KeyFrame kf;
+            kf.frameNumber = rotations[p].frameNumber;
+            kf.transform.rotation = rotations[p].transform.rotation;
+            if (r == 0) kf.transform.position = positions[r].transform.position; // if no prev rotation
+            else {
+                kf.transform.position = InterpolatePositions(positions[r-1].transform.position,
+                                                             positions[r].transform.position,
+                                                             positions[r-1].frameNumber,
+                                                             positions[r].frameNumber,
+                                                             rotations[p].frameNumber);
+            }
+            ret.push_back(kf);
+            ++r;
+        }
+    }
+    
+    return ret;
 }
 
 
 // return false if no channels are found
-//static bool LoadAnimation(const aiAnimation *animation, Animation &ret)
-//{
-//    // KeyFrame *keyFrames, uint32_t keyFrameCount, uint64_t fps, uint64_t totalFrames, const std::string &name
-//    float fps = animation->mTicksPerSecond;
-//    std::string name(animation->mName.C_Str());
-//    uint64_t totalFrames = animation->mDuration;
-//    unsigned int boneCount = animation->mNumChannels;
-//    if (!boneCount) return false;
-//
-//    unsigned int keyFrameCount = animation->mChannels[0]->mNumPositionKeys;
-//    KeyFrame *keyFrames = new KeyFrame[keyFrameCount];
-//    for (unsigned int kf = 0; kf < keyFrameCount; ++kf)
-//    {
-//        keyFrames[kf].frameNumber = animation->mChannels[0]->mPositionKeys[0].mTime * fps;
-//        keyFrames[kf].transformCount = boneCount;
-//        keyFrames[kf].transforms = new AnimationTransform[boneCount];
-//        for (unsigned int bn = 0; bn < boneCount; ++bn)
-//        {
-//            keyFrames[kf].transforms[bn].position = simd_make_float3(animation->mChannels[bn]->mPositionKeys[kf].mValue.x,
-//                                                                     animation->mChannels[bn]->mPositionKeys[kf].mValue.y,
-//                                                                     animation->mChannels[bn]->mPositionKeys[kf].mValue.z);
-//            keyFrames[kf].transforms[bn].orientation = simd_quaternion(animation->mChannels[bn]->mRotationKeys[kf].mValue.x,
-//                                                                       animation->mChannels[bn]->mRotationKeys[kf].mValue.y,
-//                                                                       animation->mChannels[bn]->mRotationKeys[kf].mValue.z,
-//                                                                       animation->mChannels[bn]->mRotationKeys[kf].mValue.w);
-//        }
-//    }
-//
-//    ret = Animation(keyFrames, keyFrameCount, fps, totalFrames, name);
-//    return true;
-//}
+static bool LoadAnimation(const aiAnimation *animation, Animation &ret)
+{
+    // KeyFrame *keyFrames, uint32_t keyFrameCount, uint64_t fps, uint64_t totalFrames, const std::string &name
+    float fps = animation->mTicksPerSecond;
+    std::string name(animation->mName.C_Str());
+    uint64_t totalFrames = animation->mDuration;
+    unsigned int boneCount = animation->mNumChannels;
+    if (!boneCount) return false;
+    
+    std::vector<Channel> channels;
+    channels.reserve(boneCount);
+    for (unsigned int boneIndex = 0; boneIndex < boneCount; ++boneIndex)
+    {
+        aiNodeAnim *nodeAnim = animation->mChannels[boneIndex];
+        unsigned int posKeyCount = nodeAnim->mNumPositionKeys;
+        unsigned int rotKeyCount = nodeAnim->mNumRotationKeys;
+        
+        // find positions
+        std::vector<KeyFrame> positions;
+        positions.reserve(posKeyCount);
+        for (unsigned int i = 0; i < posKeyCount; ++i)
+        {
+            AnimationTransform transform;
+            transform.position = simd_make_float3(nodeAnim->mPositionKeys[i].mValue.x,
+                                                  nodeAnim->mPositionKeys[i].mValue.y,
+                                                  nodeAnim->mPositionKeys[i].mValue.z);
+            uint32_t frameNumber = nodeAnim->mPositionKeys[i].mTime * fps;
+            positions.push_back(KeyFrame(transform, frameNumber));
+        }
+        
+        // find rotations
+        std::vector<KeyFrame> rotations;
+        rotations.reserve(rotKeyCount);
+        for (unsigned int i = 0; i < rotKeyCount; ++i)
+        {
+            AnimationTransform transform;
+            transform.rotation = simd_quaternion(nodeAnim->mRotationKeys[i].mValue.x,
+                                                 nodeAnim->mRotationKeys[i].mValue.y,
+                                                 nodeAnim->mRotationKeys[i].mValue.z,
+                                                 nodeAnim->mRotationKeys[i].mValue.w);
+            uint32_t frameNumber = nodeAnim->mRotationKeys[i].mTime * fps;
+            positions.push_back(KeyFrame(transform, frameNumber));
+        }
+        
+        std::vector<KeyFrame> keyFrames = MergeAndInterpolate(positions, rotations);
+        channels.push_back(Channel(&keyFrames[0], keyFrames.size()));
+    }
+
+    ret = Animation(&channels[0], channels.size(), fps, totalFrames, name);
+    return true;
+}
 
 
-static void LoadScene(const std::string &filepath, std::vector<MeshData> &meshDatas, std::vector<Animation> &animations)
+static void LoadScene(const std::string &filepath, std::vector<MeshData> &meshDatas, Skeleton &skeleton, std::vector<Animation> &animations)
 {
     Assimp::Importer importer;
     const aiScene *scene = importer.ReadFile(filepath,
@@ -158,11 +281,11 @@ static void LoadScene(const std::string &filepath, std::vector<MeshData> &meshDa
     {
         meshDatas.resize(scene->mNumMeshes);
         for (int i = 0; i < scene->mNumMeshes; ++i)
-            LoadMesh(scene, scene->mMeshes[i], meshDatas[i]);
+            LoadMesh(scene, scene->mMeshes[i], meshDatas[i], skeleton);
         
         animations.resize(scene->mNumAnimations);
-//        for (int i = 0; i < scene->mNumAnimations; ++i)
-//            LoadAnimation(scene->mAnimations[i], animations[i]);
+        for (int i = 0; i < scene->mNumAnimations; ++i)
+            LoadAnimation(scene->mAnimations[i], animations[i]);
     }
     
     else std::cout << "Could not load file from: " << filepath << std::endl;
@@ -170,12 +293,11 @@ static void LoadScene(const std::string &filepath, std::vector<MeshData> &meshDa
 }
 
 
-std::shared_ptr<std::vector<MeshData>> MeshLoader::LoadFromFile(const char *filepath)
+std::shared_ptr<SceneLoader::Data> SceneLoader::LoadFromFile(const char *filepath)
 {
-    auto meshDatas = new std::vector<MeshData>;
-    auto animations = new std::vector<Animation>;
-    LoadScene(filepath, *meshDatas, *animations);
-    return std::shared_ptr<std::vector<MeshData>>(meshDatas);
+    Data *data = new Data;
+    LoadScene(filepath, data->meshDatas, data->skeleton, data->animations);
+    return std::shared_ptr<Data>(data);
 }
 
 

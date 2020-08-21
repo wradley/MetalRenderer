@@ -66,8 +66,6 @@ std::vector<Mesh> RendererResourceDelegate::createMeshes(std::shared_ptr<std::ve
         mesh.indexCount = data.indices.size();
         mesh.indexOffset = vertsSize;
         assignUniform(mesh.uniformBuffer, mesh.uniformBufferOffset);
-        if (data.skeleton.boneCount)
-            assignBoneMatrices(data.skeleton.boneCount, mesh.boneBuffer, mesh.boneBufferOffset);
         uploads.push_back(upload);
         meshes.push_back(mesh);
         mVertexIndexBuffers.push_back(viBuffer);
@@ -76,6 +74,14 @@ std::vector<Mesh> RendererResourceDelegate::createMeshes(std::shared_ptr<std::ve
     [encoder endEncoding];
     [cmdBuff commit];
     return meshes;
+}
+
+
+GPUSkeleton RendererResourceDelegate::createSkeletonBuffer(std::shared_ptr<Skeleton> skeleton)
+{
+    GPUSkeleton retSkeleton;
+    assignBoneMatrices(skeleton->boneCount, retSkeleton.mBuffer, retSkeleton.mOffset);
+    return retSkeleton;
 }
 
 

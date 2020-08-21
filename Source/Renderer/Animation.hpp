@@ -2,6 +2,7 @@
 #pragma once
 #include <string>
 #include <simd/simd.h>
+#include "../Math/MathDefines.h"
 #include "../Math/MatrixOperations.hpp"
 
 class AnimationTransform
@@ -72,6 +73,12 @@ public:
     Animation(Animation &&a);
     Animation& operator= (const Animation &a);
     ~Animation();
+    
+    // from linear to interpolation type (currently cos)
+    static inline float InterpolationConverter(float x)
+    {
+        return (cosf(PI*x - PI) + 1.0f) / 2.0f;
+    }
 
     // one channel per bone
     Channel *channels;
